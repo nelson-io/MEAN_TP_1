@@ -8,6 +8,7 @@ library(naniar)
 
 
 
+
 #Descargamos los datos de Buenos Aires Data
  # bicis_df <- read_csv(
  #   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/recorridos-realizados-2018.csv"
@@ -53,7 +54,7 @@ ggplot(operaciones_mes)+
   ylab("# de Operaciones")+
   theme_bw()
 
-#c duracion de recorridos e identificacion de outliers
+#c duracion de recorridos 
 
 # problema, pasar a minutos la duracion del recorrido
 
@@ -65,6 +66,19 @@ bicis_df$duracion_recorrido <- bicis_df$duracion_recorrido %>%
 #coercemos la variable a numerico para obtener segundos y transformamos a minutos
 bicis_df$duracion_recorrido_minutos <- (hms(bicis_df$duracion_recorrido) %>% 
                                           as.numeric())/60
+
+
+#hacemos un histograma del tiempo de uso
+ggplot(bicis_df)+
+  geom_histogram(aes(x = duracion_recorrido_minutos),
+                 col = "white", fill = "blue", alpha = .8, bins = 50)+
+  theme_bw()+
+  ggtitle("Tiempo de uso de ECOBICI")+
+  xlab("Minutos")+
+  ylab("Frecuencia")  
+## notamos fuerte asimetría hacia la derecha y la presencia de outliers
+
+#d duración de recorrido por día de semana 
 
 #generamos variable dia de semana 
 
@@ -85,13 +99,13 @@ ggplot(bicis_df %>% sample_n(2e4),
   
  
 
-#identificamos presencia de outliers en duracion_recorrido_minutos a través del criterio del rango intercuartil
+#e identificamos presencia de outliers en duracion_recorrido_minutos a través del criterio del rango intercuartil
 
 outliers <- bicis_df %>% 
   filter(duracion_recorrido_minutos > 1.5*IQR(duracion_recorrido_minutos, na.rm = T)+
            quantile(duracion_recorrido_minutos,.75, na.rm = T))
 
-#Hacemos un histograma de los outliers para ver cómo se distribuyen
+# Hacemos un histograma de los outliers para ver cómo se distribuyen
 
 ggplot(outliers)+
   geom_histogram(aes(x =duracion_recorrido_minutos), col = " White", binwidth = 3)+
@@ -103,12 +117,12 @@ ggplot(outliers)+
 # Se puede observar una notable asimetría hacia la derecha en los outliers estando los valores más extremos
 # rondando las 3 horas
   
-# Evaluamos cantidad de misings por variable
+# f Evaluamos cantidad de misings por variable
 map_df(bicis_df, ~ sum(is.na(.))) %>% 
   gather(key = "Variable",value = "Missings") %>% 
   arrange(desc(Missings))
 
-# Evaluamos el porcentaje de completitud de cada variable
+#  Evaluamos el porcentaje de completitud de cada variable
 
 map_df(bicis_df, ~ 1- sum(is.na(.))/sum(!(is.na(.)))) %>% 
   gather(key = "Variable",value = "Completitud" ) %>% 
@@ -121,4 +135,19 @@ gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos))
 # no hay datos de  fecha_destino_recorrido ni de duración_recorrido
 # seguido por los casos en que no hay datos del domicilio de la estación de destino ni de sus coordenadas geográficas
 # por último hay ungrupo muy reducido en el que ninguna de las 5 variables descritas anteriormente están presentes
+
+#g por último ofrecemos algunas estadísticas descriptivas
+
+bicis_df$genero_usuario <- as.factor(bicis_df$genero_usuario)
+summary(bicis_df)
+
+
+# 2)
+
+
+
+
+
+
+
 

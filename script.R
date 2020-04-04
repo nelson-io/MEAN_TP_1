@@ -4,23 +4,25 @@ library(lubridate)
 library(skimr)
 library(rio)
 library(units)
-
+library(naniar)
 
 
 
 #Descargamos los datos de Buenos Aires Data
-# bicis_df <- read_csv(
-#   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/recorridos-realizados-2018.csv"
-# )
+ # bicis_df <- read_csv(
+ #   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/recorridos-realizados-2018.csv"
+ # )
 
 
 bicis_df <- import("bicis_df.RDS")
 
 #Guardamos archivo localmente
-# export(bicis_df, "bicis_df.RDS")
+ # export(bicis_df, "bicis_df.RDS")
 
 
-# EDA
+# 1) EDA
+
+
 
 #a observar evolución de cantidad de operaciones por día
 
@@ -51,11 +53,11 @@ ggplot(operaciones_mes)+
   ylab("# de Operaciones")+
   theme_bw()
 
-#duracion de recorridos e identificacion de outliers
+#c duracion de recorridos e identificacion de outliers
 
 # problema, pasar a minutos la duracion del recorrido
 
-#Primero usamos expresiones regulares para aislar la componente hms
+# Primero usamos expresiones regulares para aislar la componente hms
 
 bicis_df$duracion_recorrido <- bicis_df$duracion_recorrido %>%
   str_extract("(\\d{2}:){2}\\d{2}")
@@ -83,8 +85,40 @@ ggplot(bicis_df %>% sample_n(2e4),
   
  
 
-#Dado que hay outliers
+#identificamos presencia de outliers en duracion_recorrido_minutos a través del criterio del rango intercuartil
 
+outliers <- bicis_df %>% 
+  filter(duracion_recorrido_minutos > 1.5*IQR(duracion_recorrido_minutos, na.rm = T)+
+           quantile(duracion_recorrido_minutos,.75, na.rm = T))
 
+#Hacemos un histograma de los outliers para ver cómo se distribuyen
 
+ggplot(outliers)+
+  geom_histogram(aes(x =duracion_recorrido_minutos), col = " White", binwidth = 3)+
+  theme_bw()+
+  scale_x_continuous(breaks = seq(60,180,20))+
+  ggtitle("Histograma de Outliers")
+  
+
+# Se puede observar una notable asimetría hacia la derecha en los outliers estando los valores más extremos
+# rondando las 3 horas
+  
+# Evaluamos cantidad de misings por variable
+map_df(bicis_df, ~ sum(is.na(.))) %>% 
+  gather(key = "Variable",value = "Missings") %>% 
+  arrange(desc(Missings))
+
+# Evaluamos el porcentaje de completitud de cada variable
+
+map_df(bicis_df, ~ 1- sum(is.na(.))/sum(!(is.na(.)))) %>% 
+  gather(key = "Variable",value = "Completitud" ) %>% 
+  arrange(Completitud)
+
+# Evaluamos la existencia de patrones de missingness
+gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos))
+
+# Se observa que existen 3 tipos de combinaciones de missing data, el caso más reiterado es en el que 
+# no hay datos de  fecha_destino_recorrido ni de duración_recorrido
+# seguido por los casos en que no hay datos del domicilio de la estación de destino ni de sus coordenadas geográficas
+# por último hay ungrupo muy reducido en el que ninguna de las 5 variables descritas anteriormente están presentes
 

@@ -222,4 +222,35 @@ df_606320 <- left_join(df_606320, df_distancias)
 #removemos del global env lo que no precisemos
 rm(list = setdiff(ls(),c("df_606320", "bicis_df")))
 
+# calculamos km/h 
 
+df_606320 <-  df_606320 %>% 
+  mutate(km_h = (distancia/1e3)/(duracion_recorrido_minutos/60))
+
+
+#por último calculamos la velocidad media del usuario a través de la media harmónica
+
+harmonic_mean <- function(x){
+  (mean(x^(-1)))^(-1)
+}
+
+harmonic_weighted_mean <- function(x, weights){
+  (sum((weights * x^(-1)))/sum(weights))^(-1)
+}
+
+
+
+harmonic_mean(df_606320$km_h) 
+harmonic_weighted_mean(x = df_606320$km_h, weights = df_606320$distancia/1e3 )
+
+# Observamos que la velocidad media es de 8,1329 KM/H empleando la media harmónica
+# No obstante, no son equidistantes los recorridos por lo que resulta conveniente
+# emplear una media harmónica ponderada por las distancias.
+# Al usar la media Harmónica ponderada, la velocidad media es de 8.8152 km/h
+
+# El problema de emplear la media aritmética, es que este estadístico
+# se calcula de manera aditiva y no contempla el hecho de que cuando vamos a una velocidad mayor,
+# es menor el tiempo que se 
+# transcurre viajando. Consecuentemente, el estadístico suele sobreestimar la velocidad.
+# En cambio, la media harmónica, al emplear recíprocos,permite anular este efecto,
+# ya que implícitamente opera con el ratio de horas por km.

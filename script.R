@@ -5,20 +5,21 @@ library(skimr)
 library(rio)
 library(units)
 library(naniar)
+library(jsonlite)
 
 
 
 
-#Descargamos los datos de Buenos Aires Data
- # bicis_df <- read_csv(
- #   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/recorridos-realizados-2018.csv"
- # )
+# Descargamos los datos de Buenos Aires Data
+# bicis_df <- read_csv(
+#   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/recorridos-realizados-2018.csv"
+# )
 
 
-bicis_df <- import("bicis_df.RDS")
+# bicis_df <- import("bicis_df.RDS")
 
 #Guardamos archivo localmente
- # export(bicis_df, "bicis_df.RDS")
+  # export(bicis_df, "bicis_df.RDS")
 
 
 # 1) EDA
@@ -129,12 +130,15 @@ map_df(bicis_df, ~ 1- sum(is.na(.))/sum(!(is.na(.)))) %>%
   arrange(Completitud)
 
 # Evaluamos la existencia de patrones de missingness
-gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos))
 
-# Se observa que existen 3 tipos de combinaciones de missing data, el caso más reiterado es en el que 
+
+gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos), nsets = n_var_miss(bicis_df))
+
+# Se observa que existen 7 tipos de combinaciones de missing data, el caso más reiterado es en el que 
 # no hay datos de  fecha_destino_recorrido ni de duración_recorrido
 # seguido por los casos en que no hay datos del domicilio de la estación de destino ni de sus coordenadas geográficas
-# por último hay ungrupo muy reducido en el que ninguna de las 5 variables descritas anteriormente están presentes
+# El caso análogo para los datos de origen
+# Otras combinaciones que aparecen con menor frecuencia
 
 #g por último ofrecemos algunas estadísticas descriptivas
 
@@ -144,10 +148,78 @@ summary(bicis_df)
 
 # 2)
 
+# 3)
+
+# 4) Identificamos los registros del usuario 606320 con origen distinto a destino y
+#omitimos los que tienen destino u origen NA
+df_606320 <- bicis_df %>% 
+  filter(id_usuario == 606320,
+         nombre_estacion_origen != nombre_estacion_destino,
+         !is.na(id_estacion_destino),
+         !is.na(id_estacion_origen))
+
+#Calculamos distancia entre estaciones 
+#para esto usamos la API de google maps.
+
+# seteamos la API KEY
+apiKEY <- read_lines(choose.files()) #elegimos el documento donde hayamos guardado nuestra apiKEY
+
+# Dado que las consultas son limitadas, conservamos las combinaciones únicas de origen destino
+# para minimizar la cantidad total de consultas a la API
+
+df_606320_pairs <-  df_606320 %>%
+  select(
+    id_estacion_origen,
+    long_estacion_origen,
+    lat_estacion_origen,
+    id_estacion_destino,
+    long_estacion_destino,
+    lat_estacion_destino
+  ) %>% 
+  unique()
+
+#Definimos la consulta base de la url de consulta para la api de google
+
+url_base <- "https://maps.googleapis.com/maps/api/distancematrix/json?"
+
+# Hacemos una función que extraiga la distancia en metros de cada recorrido
+distance_extractor <- function(x){
+  url <- paste0(url_base, 
+                "origins=",
+                x$lat_estacion_origen,",", 
+                x$long_estacion_origen, "&destinations=",
+                x$lat_estacion_destino, ",",
+                x$long_estacion_destino,"&key=",
+                apiKEY)
+                
+  
+  
+  json <- fromJSON(txt = url)
+  
+  distance <- json$rows$elements[[1]]$distance$value
+   
+  return(distance)
+}
+
+#inicializamos df
+df_distancias <- data.frame()
+# hacemos for loop
+
+for(i in 1:nrow(df_606320_pairs)){
+  
+  df <- df_606320_pairs %>% slice(i)
+  distancia <- distance_extractor(df)
+  
+  df_distancias <- rbind(df_distancias, cbind(df,distancia = distancia))
+  
+}
 
 
+#hacemos un left join para integrar las distancias a los registros del usuario
 
+df_606320 <- left_join(df_606320, df_distancias)
 
-
+#removemos del global env lo que no precisemos
+rm(list = setdiff(ls(),c("df_606320", "bicis_df")))
 
 

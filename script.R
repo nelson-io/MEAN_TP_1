@@ -6,7 +6,8 @@ library(rio)
 library(units)
 library(naniar)
 library(jsonlite)
-
+library(hrbrthemes)
+library(ggthemes)
 
 
 
@@ -146,7 +147,45 @@ bicis_df$genero_usuario <- as.factor(bicis_df$genero_usuario)
 summary(bicis_df)
 
 
-# 2)
+# 2) #partimos de la cantidad total de usuarios por día de semana
+
+operaciones_dia <- operaciones_dia %>% 
+  mutate(dia_semana = wday(fecha_origen_ymd,label = T,abbr = F))
+
+# generamos intervalos de confianza por día de semana
+
+t.test(operaciones_dia$registros,conf.level = .95)$conf.int[2]
+
+operaciones_dia_summ <- operaciones_dia %>% 
+  group_by(dia_semana) %>% 
+  summarise(media = mean(registros),
+            int_min = t.test(registros,conf.level = .95)$conf.int[1],
+            int_max = t.test(registros,conf.level = .95)$conf.int[2])
+
+#hacemos Cleveland point plot
+
+ggplot(operaciones_dia_summ, aes(x = fct_rev(dia_semana))) +
+  geom_segment( aes(xend=dia_semana, y=int_min, yend=int_max), color="grey") +
+  geom_point( aes(y=int_min), color=rgb(0.7,0.2,0.1,0.5), size=3 ) +
+  geom_point( aes( y=int_max), color=rgb(0.2,0.7,0.1,0.5), size=3 ) +
+  geom_point(aes(y= media), size = 2)+
+  coord_flip()+
+  theme_tufte() +
+  theme(
+    legend.position = "none",
+  ) +
+  xlab("Día de la semana") +
+  ylab("Cantidad de Registros")
+
+# A partir de la tabla y tal como se ha constatado en la visual, para un nivel de significancia del 5%
+# ünicamente podemos encontrar diferencias significativas en las medias al comparar el
+# grupo comprendido por los días lunes, martes, mércoles, jueves y viernes, con el comprendido por los 
+# días sábado y domingo.
+# Es decir, existe superposición de los intevalos de confianza entre los días de semana entre sí, como así
+# también para los días de los fines de semana entre sí pero no al comparar días de semana con días del
+# fin de semana.
+
+
 
 # 3)
 

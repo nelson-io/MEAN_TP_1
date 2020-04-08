@@ -6,7 +6,6 @@ library(rio)
 library(units)
 library(naniar)
 library(jsonlite)
-library(hrbrthemes)
 library(ggthemes)
 
 
@@ -175,7 +174,8 @@ ggplot(operaciones_dia_summ, aes(x = fct_rev(dia_semana))) +
     legend.position = "none",
   ) +
   xlab("Día de la semana") +
-  ylab("Cantidad de Registros")
+  ylab("Cantidad de Registros")+
+  ggtitle("Intervalos de confianza de registros medios por día de semana")
 
 # A partir de la tabla y tal como se ha constatado en la visual, para un nivel de significancia del 5%
 # ünicamente podemos encontrar diferencias significativas en las medias al comparar el

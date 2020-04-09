@@ -9,7 +9,6 @@ library(jsonlite)
 library(ggthemes)
 
 
-
 # Descargamos los datos de Buenos Aires Data
 # bicis_df <- read_csv(
 #   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/recorridos-realizados-2018.csv"
@@ -41,6 +40,9 @@ ggplot(operaciones_dia)+
   xlab("Operaciones")+
   ylab("# de Operaciones")+
   theme_bw()
+#####Título: Número de operaciones por día - Eje X pondría mes - Eje Y pondría Número de operaciones
+##### A grandes rasgos podemos observar que en la primavera incrementa la cantidad de operaciones diarias con su pico en octubre
+
 
 #b operaciones por mes
 
@@ -55,8 +57,10 @@ ggplot(operaciones_mes)+
   ylab("# de Operaciones")+
   theme_bw()
 
-#c duracion de recorridos 
+#####Título: Número de operaciones por mes - Eje X: Mes - Eje Y: Número de operaciones
+#####Cambiamos todo a grey o a blue?
 
+#c duracion de recorridos 
 # problema, pasar a minutos la duracion del recorrido
 
 # Primero usamos expresiones regulares para aislar la componente hms
@@ -78,6 +82,10 @@ ggplot(bicis_df)+
   xlab("Minutos")+
   ylab("Frecuencia")  
 ## notamos fuerte asimetría hacia la derecha y la presencia de outliers
+#####bins mas chicas darian un poco mas de visibilidad
+#####Eje Y: Número de operaciones
+#####el pico se da entre los 20 y 30 minutos
+#####los outliers probablmenete se deben a las bicis que falla el sistema de bloqueo y desbloqueo, y a los que no conocen la norma y superan el maximo (yo jaja)
 
 #d duración de recorrido por día de semana 
 
@@ -98,7 +106,8 @@ ggplot(bicis_df %>% sample_n(2e4),
   xlab("dia de semana")+
   ylab("duracion del recorrido en minutos")
   
- 
+#####Boxplot: Duración de viaje por día de la semana
+##### Eje X: Día - Eje Y: Duración del recorrido (Minutos)
 
 #e identificamos presencia de outliers en duracion_recorrido_minutos a través del criterio del rango intercuartil
 
@@ -113,7 +122,9 @@ ggplot(outliers)+
   theme_bw()+
   scale_x_continuous(breaks = seq(60,180,20))+
   ggtitle("Histograma de Outliers")
-  
+
+#####Eje X: Duración del recorrido (Minutos)
+#####Eje Y: Número de operaciones
 
 # Se puede observar una notable asimetría hacia la derecha en los outliers estando los valores más extremos
 # rondando las 3 horas
@@ -184,6 +195,7 @@ ggplot(operaciones_dia_summ, aes(x = fct_rev(dia_semana))) +
 # también para los días de los fines de semana entre sí pero no al comparar días de semana con días del
 # fin de semana.
 
+#####Para la estacionalidad además agregaría los gráficos de usos por día y por mes
 
 
 # 3) identificamos días feriados de API de feriados

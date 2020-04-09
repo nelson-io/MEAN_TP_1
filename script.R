@@ -153,7 +153,6 @@ operaciones_dia <- operaciones_dia %>%
 
 # generamos intervalos de confianza por día de semana
 
-t.test(operaciones_dia$registros,conf.level = .95)$conf.int[2]
 
 operaciones_dia_summ <- operaciones_dia %>% 
   group_by(dia_semana) %>% 
@@ -167,7 +166,7 @@ ggplot(operaciones_dia_summ, aes(x = fct_rev(dia_semana))) +
   geom_segment( aes(xend=dia_semana, y=int_min, yend=int_max), color="grey") +
   geom_point( aes(y=int_min), color=rgb(0.7,0.2,0.1,0.5), size=3 ) +
   geom_point( aes( y=int_max), color=rgb(0.2,0.7,0.1,0.5), size=3 ) +
-  geom_point(aes(y= media), size = 2)+
+  geom_point(aes(y= media), size = 2, shape = 1 )+
   coord_flip()+
   theme_tufte() +
   theme(
@@ -187,7 +186,53 @@ ggplot(operaciones_dia_summ, aes(x = fct_rev(dia_semana))) +
 
 
 
-# 3)
+# 3) identificamos días feriados de API de feriados
+
+
+feriados <- fromJSON("http://nolaborables.com.ar/api/v2/feriados/2018") %>% 
+  transmute(feriado = ymd(paste0("2018-",mes,"-",dia))) %>% 
+  pull()
+
+#filtramos omitiendo estos días y corremos lo mismo que en 2)
+
+bicis_df_sf <- bicis_df %>% 
+  filter(!(fecha_origen_ymd %in% feriados))
+
+
+# generamos intervalos de confianza por día de semana
+
+
+operaciones_dia_summ_sf <- operaciones_dia %>% 
+  filter(!(fecha_origen_ymd %in% feriados)) %>% 
+  group_by(dia_semana) %>% 
+  summarise(media = mean(registros),
+            int_min = t.test(registros,conf.level = .95)$conf.int[1],
+            int_max = t.test(registros,conf.level = .95)$conf.int[2])
+
+#hacemos Cleveland point plot
+
+ggplot(operaciones_dia_summ_sf, aes(x = fct_rev(dia_semana))) +
+  geom_segment( aes(xend=dia_semana, y=int_min, yend=int_max), color="grey") +
+  geom_point( aes(y=int_min), color=rgb(0.7,0.2,0.1,0.5), size=3 ) +
+  geom_point( aes( y=int_max), color=rgb(0.2,0.7,0.1,0.5), size=3 ) +
+  geom_point(aes(y= media), size = 2, shape = 1 )+
+  coord_flip()+
+  theme_tufte() +
+  theme(
+    legend.position = "none",
+  ) +
+  xlab("Día de la semana") +
+  ylab("Cantidad de Registros")+
+  ggtitle("Intervalos de confianza de registros medios por día de semana (sin feriados)")
+
+#luego de comparar los resultados y hacer las visualizaciones, encontramos variaciones
+# que denotan una mayor cantidad de operaciones para todos los días de la semana (excepto jueves
+# dado que no hubo feriados). En este sentido, las mayores diferencias absolutas se aprecian en los días 
+# lunes y martes. No obstante, dados los nuevos intervalos de confianza, no hay evidencia estadística de
+# que al remover los feriados haya diferencias en las medias vs contemplando los feriados con un nivel
+# de significatividad del 5%. Adicionalmente, se siguen presentando diferencias estadísticamente
+# significativas entre los valores medios de los días de semana y los correspondientes a los fines de semana.
+ 
 
 # 4) Identificamos los registros del usuario 606320 con origen distinto a destino y
 #omitimos los que tienen destino u origen NA

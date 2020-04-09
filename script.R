@@ -16,7 +16,7 @@ library(ggthemes)
 # )
 
 
-# bicis_df <- import("bicis_df.RDS")
+ # bicis_df <- import("bicis_df.RDS")
 
 #Guardamos archivo localmente
   # export(bicis_df, "bicis_df.RDS")
@@ -37,20 +37,20 @@ operaciones_dia <- bicis_df %>%
 
 ggplot(operaciones_dia)+
   geom_line(aes(x = fecha_origen_ymd, y = registros))+
-  ggtitle("Cantidad de operaciones por día")+
-  xlab("Operaciones")+
-  ylab("# de Operaciones")+
+  ggtitle("Número de operaciones por día")+
+  xlab("Mes")+
+  ylab("Número de Operaciones")+
   theme_bw()
 
 #b operaciones por mes
 
 operaciones_mes <- bicis_df %>%
-  group_by(mes = month(fecha_origen_ymd, label = T, abbr =T)) %>%
+  group_by(mes = month(fecha_origen_ymd, label = T, abbr =F)) %>%
   summarise(registros = n())
 
 ggplot(operaciones_mes)+
-  geom_col(aes(x = mes, y = registros), fill = "blue", alpha=.8)+
-  ggtitle("Cantidad de operaciones por mes")+
+  geom_col(aes(x = mes, y = registros), alpha=.8)+
+  ggtitle("Número de operaciones por mes")+
   xlab("Meses")+
   ylab("# de Operaciones")+
   theme_bw()
@@ -72,11 +72,11 @@ bicis_df$duracion_recorrido_minutos <- (hms(bicis_df$duracion_recorrido) %>%
 #hacemos un histograma del tiempo de uso
 ggplot(bicis_df)+
   geom_histogram(aes(x = duracion_recorrido_minutos),
-                 col = "white", fill = "blue", alpha = .8, bins = 50)+
+                 col = "white", alpha = .8, bins = 80)+
   theme_bw()+
   ggtitle("Tiempo de uso de ECOBICI")+
   xlab("Minutos")+
-  ylab("Frecuencia")  
+  ylab("Número de operaciones")  
 ## notamos fuerte asimetría hacia la derecha y la presencia de outliers
 
 #d duración de recorrido por día de semana 
@@ -94,9 +94,9 @@ ggplot(bicis_df %>% sample_n(2e4),
   geom_jitter(col= "blue", alpha = .05)+
   coord_cartesian(ylim=c(0,75))+
   theme_bw()+
-  ggtitle("Boxplots duracion de viaje por dia de semana")+
-  xlab("dia de semana")+
-  ylab("duracion del recorrido en minutos")
+  ggtitle("Duracion de viaje por dia de la semana")+
+  xlab("Día")+
+  ylab("Duración del recorrido (Minutos)")
   
  
 
@@ -112,7 +112,9 @@ ggplot(outliers)+
   geom_histogram(aes(x =duracion_recorrido_minutos), col = " White", binwidth = 3)+
   theme_bw()+
   scale_x_continuous(breaks = seq(60,180,20))+
-  ggtitle("Histograma de Outliers")
+  ggtitle("Histograma de Outliers")+
+  xlab("Duración del recorrido (Minutos)")+
+  ylab("Número de operaciones")
   
 
 # Se puede observar una notable asimetría hacia la derecha en los outliers estando los valores más extremos
@@ -139,6 +141,71 @@ gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos), nsets = n_var_mi
 # seguido por los casos en que no hay datos del domicilio de la estación de destino ni de sus coordenadas geográficas
 # El caso análogo para los datos de origen
 # Otras combinaciones que aparecen con menor frecuencia
+
+#lo que llama poderosamente la atención en esta visual, es que las observaciones que no disponen
+#datos de id de estación, cordenadas geográficas y domicilio, sí suelen disponer de nombre 
+#de estación. 
+
+#Dado este hallazgo, identificaremos los nombres de esas estaciones y en caso de que sea 
+#posible inferir el resto de los datos, procederemos a imputarlos.
+
+bicis_df %>% 
+  filter(is.na(id_estacion_origen)) %>% 
+  pull(nombre_estacion_origen) %>% table()
+
+bicis_df %>% 
+  filter(is.na(id_estacion_destino)) %>% 
+  pull(nombre_estacion_destino) %>% table()
+
+#observamos que las estaciones con datos faltantes corresponden a las de Ecoparque
+#y Fitzroy y Gorriti
+
+# De una pequeña búsqueda cursada en google, surge que esas estaciones poseen los siguientes
+#atributos
+
+recovered_data <-  data.frame(nombre_de_estacion = c("Ecoparque", "Fitz Roy y Gorriti"),
+           id_estacion = c(44, 159),
+           latitud = c(-34.575327, -34.584879),
+           longitud = c(-58.414603, -58.437229),
+           domicilio = c("Av. del Libertador 3260","Fitz Roy y Gorriti"))
+
+# Ahora imputamos en nuestro data frame
+bicis_df[bicis_df$nombre_estacion_origen == "Ecoparque",
+         c("nombre_estacion_origen",
+           "id_estacion_origen",
+           "lat_estacion_origen",
+           "long_estacion_origen",
+           "domicilio_estacion_origen")] <- recovered_data %>% slice(1) 
+
+bicis_df[bicis_df$nombre_estacion_origen == "Fitz Roy y Gorriti",
+         c("nombre_estacion_origen",
+           "id_estacion_origen",
+           "lat_estacion_origen",
+           "long_estacion_origen",
+           "domicilio_estacion_origen")] <- recovered_data %>% slice(2) 
+
+
+bicis_df[bicis_df$nombre_estacion_destino == "Ecoparque",
+         c("nombre_estacion_destino",
+           "id_estacion_destino",
+           "lat_estacion_destino",
+           "long_estacion_destino",
+           "domicilio_estacion_destino")] <- recovered_data %>% slice(1)
+
+bicis_df[bicis_df$nombre_estacion_destino == "Fitz Roy y Gorriti",
+         c("nombre_estacion_destino",
+           "id_estacion_destino",
+           "lat_estacion_destino",
+           "long_estacion_destino",
+           "domicilio_estacion_destino")] <- recovered_data %>% slice(2)
+
+# Si ahora volvemos a evaluar la estructura de los NA observamos lo siguiente
+
+gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos), nsets = n_var_miss(bicis_df))
+
+# en todos los NA restantes se omiten tanto la duración del recorrido como la fecha de destino
+# y esta no es información que a priori corresponda imputar
+
 
 #g por último ofrecemos algunas estadísticas descriptivas
 
@@ -238,9 +305,7 @@ ggplot(operaciones_dia_summ_sf, aes(x = fct_rev(dia_semana))) +
 #omitimos los que tienen destino u origen NA
 df_606320 <- bicis_df %>% 
   filter(id_usuario == 606320,
-         nombre_estacion_origen != nombre_estacion_destino,
-         !is.na(id_estacion_destino),
-         !is.na(id_estacion_origen))
+         nombre_estacion_origen != nombre_estacion_destino)
 
 #Calculamos distancia entre estaciones 
 #para esto usamos la API de google maps.
@@ -327,10 +392,10 @@ harmonic_weighted_mean <- function(x, weights){
 harmonic_mean(df_606320$km_h) 
 harmonic_weighted_mean(x = df_606320$km_h, weights = df_606320$distancia/1e3 )
 
-# Observamos que la velocidad media es de 8,1329 KM/H empleando la media harmónica
+# Observamos que la velocidad media es de 9 KM/H empleando la media harmónica
 # No obstante, no son equidistantes los recorridos por lo que resulta conveniente
 # emplear una media harmónica ponderada por las distancias.
-# Al usar la media Harmónica ponderada, la velocidad media es de 8.8152 km/h
+# Al usar la media Harmónica ponderada, la velocidad media es de 9.9093 km/h
 
 # El problema de emplear la media aritmética, es que este estadístico
 # se calcula de manera aditiva y no contempla el hecho de que cuando vamos a una velocidad mayor,

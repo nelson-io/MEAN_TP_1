@@ -15,11 +15,18 @@ library(ggthemes)
 #   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/recorridos-realizados-2018.csv"
 # )
 
+# usuarios_df <- read_csv(
+#   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/usuarios-ecobici-2018.csv"
+# )
+
 
  # bicis_df <- import("bicis_df.RDS")
+ # bicis_df <- import("usuarios_df.RDS")
+ 
 
 #Guardamos archivo localmente
   # export(bicis_df, "bicis_df.RDS")
+  # export(usuarios_df, "usuarios_df.RDS")
 
 
 # 1) EDA
@@ -207,10 +214,38 @@ gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos), nsets = n_var_mi
 # y esta no es información que a priori corresponda imputar
 
 
-#g por último ofrecemos algunas estadísticas descriptivas
+#g Ofrecemos algunas estadísticas descriptivas
 
 bicis_df$genero_usuario <- as.factor(bicis_df$genero_usuario)
 summary(bicis_df)
+
+
+# Por último hacemos una pirámide poblacional de los usuarios inscriptos
+usuarios_plot <- usuarios_df %>% 
+  filter(usuario_sexo %in% c("M","F")) %>% 
+  mutate(rango_etario = cut(usuario_edad,breaks = seq(15,100,5))) %>% 
+  filter(!is.na(rango_etario)) %>% 
+  group_by(usuario_sexo, rango_etario) %>% 
+  summarise(total = n())
+
+
+usuarios_plot$total[usuarios_plot$usuario_sexo == "M"] <-
+  -1 * usuarios_plot$total[usuarios_plot$usuario_sexo == "M"]
+
+
+
+ggplot(usuarios_plot, aes(x = rango_etario, y = total, fill = usuario_sexo))+
+  geom_bar(stat = "identity")+
+  scale_y_continuous(breaks = seq(-6250,5000,1250),
+                     labels =c(seq(6250,0,-1250), seq(1250,5000,1250)) )+
+  coord_flip()+
+  theme_bw()+
+  ggtitle("Piramide poblacional de usuarios de ECOBICI")+
+  ylab("Número de usuarios")+
+  xlab("Rango etario (años)")+
+  labs(fill = "Sexo")
+
+
 
 
 # 2) #partimos de la cantidad total de usuarios por día de semana
@@ -369,7 +404,7 @@ for(i in 1:nrow(df_606320_pairs)){
 df_606320 <- left_join(df_606320, df_distancias)
 
 #removemos del global env lo que no precisemos
-rm(list = setdiff(ls(),c("df_606320", "bicis_df")))
+rm(list = setdiff(ls(),c("df_606320", "bicis_df", "usuarios_df")))
 
 # calculamos km/h 
 
@@ -403,3 +438,15 @@ harmonic_weighted_mean(x = df_606320$km_h, weights = df_606320$distancia/1e3 )
 # transcurre viajando. Consecuentemente, el estadístico suele sobreestimar la velocidad.
 # En cambio, la media harmónica, al emplear recíprocos,permite anular este efecto,
 # ya que implícitamente opera con el ratio de horas por km.
+
+
+
+
+
+
+
+
+
+
+
+

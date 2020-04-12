@@ -7,7 +7,8 @@ library(units)
 library(naniar)
 library(jsonlite)
 library(ggthemes)
-
+library(pwr)
+library(parsedate)
 
 
 # Descargamos los datos de Buenos Aires Data
@@ -15,13 +16,16 @@ library(ggthemes)
 #   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/recorridos-realizados-2018.csv"
 # )
 
-# usuarios_df <- read_csv(
-#   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/usuarios-ecobici-2018.csv"
-# )
+# usuarios_df <- map_df(2015:2018,~ read_csv(paste0(
+#   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/usuarios-ecobici-",
+#   .x, ".csv")) %>%
+#     mutate(fecha_alta = parse_date(fecha_alta)))
+
+
 
 
  # bicis_df <- import("bicis_df.RDS")
- # bicis_df <- import("usuarios_df.RDS")
+ # usuarios_df <- import("usuarios_df.RDS")
  
 
 #Guardamos archivo localmente
@@ -439,14 +443,119 @@ harmonic_weighted_mean(x = df_606320$km_h, weights = df_606320$distancia/1e3 )
 # En cambio, la media harmónica, al emplear recíprocos,permite anular este efecto,
 # ya que implícitamente opera con el ratio de horas por km.
 
+# 5)
+bicis_9_66 <-  bicis_df %>% 
+  filter(id_estacion_origen == 9,
+         id_estacion_destino == 66,
+         !is.na(duracion_recorrido_minutos))
+
+
+#hacemos binom test para diferencias en proporciones
+x <-  vector(mode = "integer", length = 2L)
+x[1] <- sum(bicis_9_66$duracion_recorrido_minutos > 15)
+x[2] <- sum(!bicis_9_66$duracion_recorrido_minutos > 15)
+
+binom.test(x = x, p = .2, alternative = "less")
+
+# 6
+# Construimos curva de potencia del test
+x <- seq(.05,.2,.001)
+x_pwr <- pwr.p.test(h = ES.h(x ,.2),n = 1073, alternative = "less" ,sig.level = .05)$power 
+plot(x, x_pwr, type = "l",lwd = 2)
+
+
+# 7 Consultando wikipedia, encontramos que la inauguración de la estación "Facultad de Derecho"
+# de la línea H, ha sido inaugurada el 17 de mayo de 2018.
+
+#identificamos los registros en que el origen y/o destino haya sido la estación de ecobici
+# Facultad de Derecho, agrupamos las observaciones por día e identificamos las observaciones previas
+# con las anteriores 
+
+
+bicis_fd <- bicis_df %>% 
+  filter(id_estacion_origen == 1 | id_estacion_destino == 1) %>% 
+  mutate(inaugurado = ifelse(fecha_origen_ymd >= ymd("2018-05-17"),1,0))
+
+#graficamos
+ggplot(bicis_fd)+
+  geom_line(aes(x=fecha_origen_ymd, y = total))+
+  geom_vline(xintercept = ymd("2018-05-17"), col = "red")+
+  theme_bw()+
+  annotate("text",ymd("2018-06-20"),300, 
+           label = "Inauguración Línea H \n Facultad de Derecho", size = 3, col= "red")+
+  ggtitle("Número de operaciones diarias involucrando estación Facultad de Derecho")+
+  xlab("Tiempo")+
+  ylab("Número de operaciones")
+
+t.test(x = bicis_fd[bicis_fd$inaugurado ==1,"total"],
+       y = bicis_fd[bicis_fd$inaugurado ==0,"total"],
+       alternative = "greater")
+
+#sí, hay diferencias estadísticamente significativas
 
 
 
+#8 #evaluamos si hay diferencias estadísticamente significativas en uso por género
+
+# bicis_daily_gen <- bicis_df %>% 
+#   group_by(fecha_origen_ymd,genero_usuario) %>% 
+#   summarise(total = n())
+# 
+# t.test(x = bicis_daily_gen[bicis_daily_gen$genero_usuario == "M","total"],
+#        y = bicis_daily_gen[bicis_daily_gen$genero_usuario == "F","total"],
+#        alternative = "two.sided",
+#        conf.level = .95)
 
 
+t.test(x = bicis_df[bicis_df$genero_usuario == "M","duracion_recorrido_minutos"],
+       y = bicis_df[bicis_df$genero_usuario == "F","duracion_recorrido_minutos"],
+       alternative = "two.sided",
+       conf.level = .95)
+
+#En este punto hay que definis si calculamos por usos o por duración en minutos
 
 
+#9 observamos lo mismo por grupo etario
+#  hacemos un left join de registros con usuarios para saber la edad de cada uno
+## primero hacemos un anti-join para saber si quedarían registro exceptuados
+anti_join(bicis_df, usuarios_df %>% select(usuario_id,usuario_edad) %>% unique(),
+          by = c("id_usuario" = "usuario_id")) %>% 
+  select(id_usuario) %>% 
+  unique() #hay 31.105 ids de los cuales no hay información
 
 
+# Ahora observamos si algun usuario aparece con más de una edad en la tabla de usuarios
+usuarios_df %>% 
+  select(usuario_id, usuario_edad) %>% 
+  unique() %>% 
+  group_by(usuario_id) %>% 
+  summarise(total = n()) %>% 
+  filter(total > 1)
 
 
+# observamos que esto acontece con dos usuarios. Procedemos a quedarnos con la última observación
+# asociada a cada registro
+
+usuarios_df <- usuarios_df %>% 
+  select(usuario_id, usuario_edad) %>% 
+  group_by(usuario_id) %>% 
+  summarise(usuario_edad = last(usuario_edad)) %>% 
+  ungroup()
+
+# realizamos el left join y omitimos registros sin edad o con una edad irracionalmente alta     
+
+bicis_df_joined <-  left_join(bicis_df, usuarios_df,by = c("id_usuario" = "usuario_id")) %>% 
+  filter(!is.na(usuario_edad),
+         !usuario_edad > 100)
+
+# ahora vamos a definir el rango etario. Vamos a  priorizar un output de grupos 
+# aproximadamente balanceados por lo que emplearemos los deciles de edad para armar 10 grupos
+
+cuts <- c(as.integer(quantile(bicis_df_joined$usuario_edad, seq(0,1,.1))))
+bicis_df_joined$rango_etario <- cut(bicis_df_joined$usuario_edad, breaks = cuts)
+  
+#análisis de varianza
+aov_rango_etario <- aov(duracion_recorrido_minutos ~ rango_etario , data = bicis_df_joined)
+
+# test honesto de Tukey pra visualizar relaciones
+TukeyHSD(aov_rango_etario)

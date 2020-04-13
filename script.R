@@ -9,6 +9,7 @@ library(jsonlite)
 library(ggthemes)
 library(pwr)
 library(parsedate)
+library(boot)
 
 
 # Descargamos los datos de Buenos Aires Data
@@ -559,3 +560,36 @@ aov_rango_etario <- aov(duracion_recorrido_minutos ~ rango_etario , data = bicis
 
 # test honesto de Tukey pra visualizar relaciones
 TukeyHSD(aov_rango_etario)
+
+
+#10
+#definimos subset de datos
+bicis_joined_9_66 <-  bicis_df_joined %>% 
+  filter(id_estacion_origen == 9,
+         id_estacion_destino == 66,
+         !is.na(duracion_recorrido_minutos))
+
+#definimos función
+cor_boot <- function(d,i){
+ data <- d[i,]
+return(cor(data$usuario_edad,data$duracion_recorrido_minutos))
+}
+
+#hacemos bootstrap
+set.seed(0)
+boot_out <- boot(data = bicis_joined_9_66,statistic = cor_boot,R = 1000)
+
+# Hacemos histograma
+
+ggplot(boot_out$t %>% data.frame(replicates = .), aes(x = replicates))+
+  geom_histogram(aes(y =..density..), col = "white", binwidth = .008)+
+  geom_density(col = "blue", size = 1, fill = "blue", alpha = .2)+
+  theme_bw()+
+  ggtitle("Distribución de réplicas bootstrap\n Coef. de Correlación entre edad y minutos de uso")+
+  xlab("réplicas")+
+  ylab("densidad")
+
+boot.ci(boot.out = boot_out, type = "perc",conf = .95) 
+
+#hay correlación positiva y estadísticamente significativa entre las variables. 
+  

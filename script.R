@@ -3,35 +3,23 @@ library(tidyverse)
 library(lubridate)
 library(skimr)
 library(rio)
-library(units)
 library(naniar)
 library(jsonlite)
 library(ggthemes)
 library(pwr)
 library(parsedate)
 library(boot)
-
+library(knitr)
 
 # Descargamos los datos de Buenos Aires Data
-# bicis_df <- read_csv(
-#   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/recorridos-realizados-2018.csv"
-# )
+bicis_df <- read_csv(
+  "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/recorridos-realizados-2018.csv"
+)
 
-# usuarios_df <- map_df(2015:2018,~ read_csv(paste0(
-#   "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/usuarios-ecobici-",
-#   .x, ".csv")) %>%
-#     mutate(fecha_alta = parse_date(fecha_alta)))
-
-
-
-
- # bicis_df <- import("bicis_df.RDS")
- # usuarios_df <- import("usuarios_df.RDS")
- 
-
-#Guardamos archivo localmente
-  # export(bicis_df, "bicis_df.RDS")
-  # export(usuarios_df, "usuarios_df.RDS")
+usuarios_df <- map_df(2015:2018,~ read_csv(paste0(
+  "http://cdn.buenosaires.gob.ar/datosabiertos/datasets/bicicletas-publicas/usuarios-ecobici-",
+  .x, ".csv")) %>%
+    mutate(fecha_alta = parse_date(fecha_alta)))
 
 
 # 1) EDA
@@ -135,13 +123,15 @@ ggplot(outliers)+
 # f Evaluamos cantidad de misings por variable
 map_df(bicis_df, ~ sum(is.na(.))) %>% 
   gather(key = "Variable",value = "Missings") %>% 
-  arrange(desc(Missings))
+  arrange(desc(Missings)) %>% 
+  kable()
 
 #  Evaluamos el porcentaje de completitud de cada variable
 
 map_df(bicis_df, ~ 1- sum(is.na(.))/sum(!(is.na(.)))) %>% 
   gather(key = "Variable",value = "Completitud" ) %>% 
-  arrange(Completitud)
+  arrange(Completitud) %>% 
+  kable()
 
 # Evaluamos la existencia de patrones de missingness
 
@@ -163,11 +153,11 @@ gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos), nsets = n_var_mi
 
 bicis_df %>% 
   filter(is.na(id_estacion_origen)) %>% 
-  pull(nombre_estacion_origen) %>% table()
+  pull(nombre_estacion_origen) %>% table() %>% kable()
 
 bicis_df %>% 
   filter(is.na(id_estacion_destino)) %>% 
-  pull(nombre_estacion_destino) %>% table()
+  pull(nombre_estacion_destino) %>% table() %>% kable()
 
 #observamos que las estaciones con datos faltantes corresponden a las de Ecoparque
 #y Fitzroy y Gorriti
@@ -241,8 +231,8 @@ usuarios_plot$total[usuarios_plot$usuario_sexo == "M"] <-
 
 ggplot(usuarios_plot, aes(x = rango_etario, y = total, fill = usuario_sexo))+
   geom_bar(stat = "identity")+
-  scale_y_continuous(breaks = seq(-6250,5000,1250),
-                     labels =c(seq(6250,0,-1250), seq(1250,5000,1250)) )+
+  scale_y_continuous(breaks = seq(-24e3,20e3,4e3),
+                     labels =c(seq(24e3,0,-4e3), seq(4e3,20e3,4e3)) )+
   coord_flip()+
   theme_bw()+
   ggtitle("Piramide poblacional de usuarios de ECOBICI")+
@@ -351,7 +341,7 @@ df_606320 <- bicis_df %>%
 #para esto usamos la API de google maps.
 
 # seteamos la API KEY
-apiKEY <- read_lines(choose.files()) #elegimos el documento donde hayamos guardado nuestra apiKEY
+apiKEY <- read_lines(tcltk::tk_choose.files()) #elegimos el documento donde hayamos guardado nuestra apiKEY
 
 # Dado que las consultas son limitadas, conservamos las combinaciones únicas de origen destino
 # para minimizar la cantidad total de consultas a la API
@@ -475,7 +465,11 @@ plot(x, x_pwr, type = "l",lwd = 2)
 
 bicis_fd <- bicis_df %>% 
   filter(id_estacion_origen == 1 | id_estacion_destino == 1) %>% 
+  group_by(fecha_origen_ymd) %>% 
+  summarise(total = n()) %>% 
   mutate(inaugurado = ifelse(fecha_origen_ymd >= ymd("2018-05-17"),1,0))
+  
+  
 
 #graficamos
 ggplot(bicis_fd)+
@@ -498,22 +492,14 @@ t.test(x = bicis_fd[bicis_fd$inaugurado ==1,"total"],
 
 #8 #evaluamos si hay diferencias estadísticamente significativas en uso por género
 
-# bicis_daily_gen <- bicis_df %>% 
-#   group_by(fecha_origen_ymd,genero_usuario) %>% 
-#   summarise(total = n())
-# 
-# t.test(x = bicis_daily_gen[bicis_daily_gen$genero_usuario == "M","total"],
-#        y = bicis_daily_gen[bicis_daily_gen$genero_usuario == "F","total"],
-#        alternative = "two.sided",
-#        conf.level = .95)
-
 
 t.test(x = bicis_df[bicis_df$genero_usuario == "M","duracion_recorrido_minutos"],
        y = bicis_df[bicis_df$genero_usuario == "F","duracion_recorrido_minutos"],
        alternative = "two.sided",
        conf.level = .95)
 
-#En este punto hay que definis si calculamos por usos o por duración en minutos
+# No tiene mucho sentido comparar por cantidad de usos porque ya sabemos que tanto en el padrón como en el uso
+# hay muchos más usuarios de sexo masculino que femenino
 
 
 #9 observamos lo mismo por grupo etario
@@ -522,7 +508,9 @@ t.test(x = bicis_df[bicis_df$genero_usuario == "M","duracion_recorrido_minutos"]
 anti_join(bicis_df, usuarios_df %>% select(usuario_id,usuario_edad) %>% unique(),
           by = c("id_usuario" = "usuario_id")) %>% 
   select(id_usuario) %>% 
-  unique() #hay 31.105 ids de los cuales no hay información
+  unique() %>% 
+  pull() %>% 
+  length() #hay 31.105 ids de los cuales no hay información
 
 
 # Ahora observamos si algun usuario aparece con más de una edad en la tabla de usuarios
@@ -560,6 +548,7 @@ aov_rango_etario <- aov(duracion_recorrido_minutos ~ rango_etario , data = bicis
 
 # test honesto de Tukey pra visualizar relaciones
 TukeyHSD(aov_rango_etario)
+
 
 
 #10

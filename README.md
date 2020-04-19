@@ -377,5 +377,214 @@ gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos), nsets = n_var_mi
 ```
 
 ![](README_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
- 
- 
+
+En todos los NA restantes se omiten tanto la duración del recorrido como la fecha de destino
+y esta no es información que a priori corresponda imputar.
+
+Para culminar la evaluación de este dataset, procedemos a cohercer la variable género a factor y ofrecemos algunas estadísticas descriptivas
+
+
+```r
+bicis_df$genero_usuario <- as.factor(bicis_df$genero_usuario)
+summary(bicis_df)
+```
+
+```
+##    id_usuario     genero_usuario fecha_origen_recorrido       
+##  Min.   :     8   F: 739160      Min.   :2018-01-01 00:08:05  
+##  1st Qu.:157791   M:1880740      1st Qu.:2018-05-15 20:29:15  
+##  Median :353194   N:     68      Median :2018-08-04 08:12:00  
+##  Mean   :328122                  Mean   :2018-07-22 04:21:50  
+##  3rd Qu.:491737                  3rd Qu.:2018-10-03 14:09:58  
+##  Max.   :672449                  Max.   :2018-12-30 19:52:41  
+##                                                               
+##  id_estacion_origen nombre_estacion_origen long_estacion_origen
+##  Min.   :  1.00     Length:2619968         Min.   :-58.46      
+##  1st Qu.: 41.00     Class :character       1st Qu.:-58.42      
+##  Median : 91.00     Mode  :character       Median :-58.40      
+##  Mean   : 94.99                            Mean   :-58.40      
+##  3rd Qu.:146.00                            3rd Qu.:-58.38      
+##  Max.   :200.00                            Max.   :-58.36      
+##                                                                
+##  lat_estacion_origen domicilio_estacion_origen duracion_recorrido
+##  Min.   :-34.64      Length:2619968            Length:2619968    
+##  1st Qu.:-34.61      Class :character          Class :character  
+##  Median :-34.60      Mode  :character          Mode  :character  
+##  Mean   :-34.60                                                  
+##  3rd Qu.:-34.59                                                  
+##  Max.   :-34.57                                                  
+##                                                                  
+##  fecha_destino_recorrido       id_estacion_destino nombre_estacion_destino
+##  Min.   :2018-01-01 00:27:58   Min.   :  1.00      Length:2619968         
+##  1st Qu.:2018-05-16 09:02:28   1st Qu.: 42.00      Class :character       
+##  Median :2018-08-04 14:40:31   Median : 92.00      Mode  :character       
+##  Mean   :2018-07-22 11:36:18   Mean   : 95.32                             
+##  3rd Qu.:2018-10-03 16:41:22   3rd Qu.:147.00                             
+##  Max.   :2018-12-30 20:04:20   Max.   :200.00                             
+##  NA's   :43723                                                            
+##  long_estacion_destino lat_estacion_destino domicilio_estacion_destino
+##  Min.   :-58.46        Min.   :-34.64       Length:2619968            
+##  1st Qu.:-58.42        1st Qu.:-34.61       Class :character          
+##  Median :-58.40        Median :-34.60       Mode  :character          
+##  Mean   :-58.40        Mean   :-34.60                                 
+##  3rd Qu.:-58.38        3rd Qu.:-34.59                                 
+##  Max.   :-58.36        Max.   :-34.57                                 
+##                                                                       
+##  fecha_origen_ymd     duracion_recorrido_minutos     dia_semana    
+##  Min.   :2018-01-01   Min.   :  5.00             domingo  :257400  
+##  1st Qu.:2018-05-15   1st Qu.: 11.75             lunes    :395736  
+##  Median :2018-08-04   Median : 18.22             martes   :426968  
+##  Mean   :2018-07-21   Mean   : 25.77             miércoles:432253  
+##  3rd Qu.:2018-10-03   3rd Qu.: 30.53             jueves   :412847  
+##  Max.   :2018-12-30   Max.   :180.00             viernes  :412845  
+##                       NA's   :43723              sábado   :281919
+```
+
+Analizando ahora el dataset de usuarios, nos pareció interesante explotar las posibilidades ofrecidas por el mismo a través de un gráfico que exhibiese una piramide poblacional de los usuarios registrados entre 2015 y 2018.
+
+Este se acompaña a continuación:
+
+
+```r
+usuarios_plot <- usuarios_df %>% 
+  filter(usuario_sexo %in% c("M","F")) %>% 
+  mutate(rango_etario = cut(usuario_edad,breaks = seq(15,100,5))) %>% 
+  filter(!is.na(rango_etario)) %>% 
+  group_by(usuario_sexo, rango_etario) %>% 
+  summarise(total = n())
+
+
+usuarios_plot$total[usuarios_plot$usuario_sexo == "M"] <-
+  -1 * usuarios_plot$total[usuarios_plot$usuario_sexo == "M"]
+```
+
+
+```r
+ggplot(usuarios_plot, aes(x = rango_etario, y = total, fill = usuario_sexo))+
+  geom_bar(stat = "identity")+
+  scale_y_continuous(breaks = seq(-24e3,20e3,4e3),
+                     labels =c(seq(24e3,0,-4e3), seq(4e3,20e3,4e3)) )+
+  coord_flip()+
+  theme_bw()+
+  ggtitle("Piramide poblacional de usuarios de ECOBICI")+
+  ylab("Número de usuarios")+
+  xlab("Rango etario (años)")+
+  labs(fill = "Sexo")
+```
+
+![](README_files/figure-html/unnamed-chunk-20-1.png)<!-- -->
+
+#### 2) Para dar un mejor servicio al usuario, se desea estudiar si (estadísticamente) existe estacionalidad en el uso de la EcoBicis. Una forma de probarlo (y comunicarlo) es construir un gráfico que reporte los intervalos de confianza de la cantidad media de usuarios por cada día de la semana. ¿Hay evidencia estadística de estacionalidad en el uso? Comente.
+
+Para resolver esta consigna, primero estimamos la cantidad total de usuarios por día de semana
+
+
+```r
+operaciones_dia <- operaciones_dia %>% 
+  mutate(dia_semana = wday(fecha_origen_ymd,label = T,abbr = F))
+```
+
+Luego generamos los intervalos de confianza por día de semana para un nivel de significatividad del 5%
+
+
+```r
+operaciones_dia_summ <- operaciones_dia %>% 
+  group_by(dia_semana) %>% 
+  summarise(media = mean(registros),
+            int_min = t.test(registros,conf.level = .95)$conf.int[1],
+            int_max = t.test(registros,conf.level = .95)$conf.int[2])
+```
+
+Por último, mostramos los datos obtenidos con un cleveland dot point que nos permite comparar de manera muy clara los intervalos de confianza como así también visualizar la media de cada caso:
+
+
+```r
+ggplot(operaciones_dia_summ, aes(x = fct_rev(dia_semana))) +
+  geom_segment( aes(xend=dia_semana, y=int_min, yend=int_max), color="grey") +
+  geom_point( aes(y=int_min), color=rgb(0.7,0.2,0.1,0.5), size=3 ) +
+  geom_point( aes( y=int_max), color=rgb(0.2,0.7,0.1,0.5), size=3 ) +
+  geom_point(aes(y= media), size = 2, shape = 1 )+
+  coord_flip()+
+  theme_tufte() +
+  theme(
+    legend.position = "none",
+  ) +
+  xlab("Día de la semana") +
+  ylab("Cantidad de Registros")+
+  ggtitle("Intervalos de confianza de registros medios por día de semana")
+```
+
+![](README_files/figure-html/unnamed-chunk-23-1.png)<!-- -->
+
+Tal como se ha constatado en la visual, para un nivel de significancia del 5%
+ünicamente podemos encontrar diferencias significativas en las medias al comparar el
+grupo comprendido por los días lunes, martes, mércoles, jueves y viernes, con el comprendido por los
+días sábado y domingo.
+Es decir, existe superposición de los intevalos de confianza entre los días de semana entre sí, como así
+también para los días de los fines de semana entre sí pero no al comparar días de semana con días del
+fin de semana.
+
+#### 3) Es sabido que la media se puede ver afectada por la presencia de valores extremos (e.g. feriados). Sobre los datos anteriores se pide que descuente del análisis los días feriados de 2018 y vuelva a construir el gráfico. ¿Cambian los resultados? Comente.
+
+
+Dado que el dataset no ofrece información acerca de qué días han sido feriados, procedemos a conectarnos a una API de feriados y descargamos un vector con todos los feriados en Argentina del año 2018
+
+
+```r
+feriados <- fromJSON("http://nolaborables.com.ar/api/v2/feriados/2018") %>% 
+  transmute(feriado = ymd(paste0("2018-",mes,"-",dia))) %>% 
+  pull()
+```
+
+
+Ahora filtramos los datos omitiendo estos días y replicamos el procedimiento realizado en el punto 2)
+
+
+```r
+bicis_df_sf <- bicis_df %>% 
+  filter(!(fecha_origen_ymd %in% feriados))
+
+
+
+
+operaciones_dia_summ_sf <- operaciones_dia %>% 
+  filter(!(fecha_origen_ymd %in% feriados)) %>% 
+  group_by(dia_semana) %>% 
+  summarise(media = mean(registros),
+            int_min = t.test(registros,conf.level = .95)$conf.int[1],
+            int_max = t.test(registros,conf.level = .95)$conf.int[2])
+```
+
+
+```r
+ggplot(operaciones_dia_summ_sf, aes(x = fct_rev(dia_semana))) +
+  geom_segment( aes(xend=dia_semana, y=int_min, yend=int_max), color="grey") +
+  geom_point( aes(y=int_min), color=rgb(0.7,0.2,0.1,0.5), size=3 ) +
+  geom_point( aes( y=int_max), color=rgb(0.2,0.7,0.1,0.5), size=3 ) +
+  geom_point(aes(y= media), size = 2, shape = 1 )+
+  coord_flip()+
+  theme_tufte() +
+  theme(
+    legend.position = "none",
+  ) +
+  xlab("Día de la semana") +
+  ylab("Cantidad de Registros")+
+  ggtitle("Intervalos de confianza de registros medios por día de semana (sin feriados)")
+```
+
+![](README_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
+
+
+Luego de comparar los resultados y hacer las visualizaciones, encontramos variaciones
+que denotan una mayor cantidad de operaciones para todos los días de la semana (excepto jueves
+dado que no hubo feriados). En este sentido, las mayores diferencias absolutas se aprecian en los días
+lunes y martes. No obstante, dados los nuevos intervalos de confianza, no hay evidencia estadística de
+que al remover los feriados haya diferencias en las medias vs contemplando los feriados con un nivel
+de significatividad del 5%. Adicionalmente, se siguen presentando diferencias estadísticamente
+significativas entre los valores medios de los días de semana y los correspondientes a los fines de semana.
+
+#### 4) Concéntrese en el usuario 606320. en 2018 realizó 95 recorridos. Elimine los casos en que la estación de origen coincide con la de destino para el mismo recorrido. Queremos calcular la velocidad media a la que usualmente se desplaza este ciclista. Cuando trabajamos con velocidades lo correcto es utilizar la media armónica (y no la media aritmética). Calculando la distancia en bici entre las estaciones (use Google Maps) y con el dato de la duración del recorrido (asumiendo que la persona “no interrumpe el recorrido”, lo cual para este usuario resulta razonable), calcule la velocidad media de circulación de dicho usuario. Comente las ventajas de usar la media armónica en lugar de la media aritmética.
+
+
+
+

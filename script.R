@@ -77,7 +77,7 @@ ggplot(bicis_df)+
   ggtitle("Tiempo de uso de ECOBICI")+
   xlab("Minutos")+
   ylab("Número de operaciones")  
-## notamos fuerte asimetría hacia la derecha y la presencia de outliers
+## notamos fuerte asimetría positiva y la presencia de outliers
 
 #d duración de recorrido por día de semana 
 
@@ -145,11 +145,11 @@ gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos), nsets = n_var_mi
 # Otras combinaciones que aparecen con menor frecuencia
 
 #lo que llama poderosamente la atención en esta visual, es que las observaciones que no disponen
-#datos de id de estación, cordenadas geográficas y domicilio, sí suelen disponer de nombre 
-#de estación. 
+#datos de id de estación, cordenadas geográficas y domicilio, sí suelen disponer de nombre
+#de estación.
 
-#Dado este hallazgo, identificaremos los nombres de esas estaciones y en caso de que sea 
-#posible inferir el resto de los datos, procederemos a imputarlos.
+# Dado este hallazgo, identificaremos los nombres de esas estaciones y en caso de que sea
+# posible inferir el resto de los datos, procederemos a imputarlos.
 
 bicis_df %>% 
   filter(is.na(id_estacion_origen)) %>% 
@@ -159,11 +159,11 @@ bicis_df %>%
   filter(is.na(id_estacion_destino)) %>% 
   pull(nombre_estacion_destino) %>% table() %>% kable()
 
-#observamos que las estaciones con datos faltantes corresponden a las de Ecoparque
-#y Fitzroy y Gorriti
-
+# observamos que las estaciones con datos faltantes corresponden a las de Ecoparque
+# y Fitzroy y Gorriti
+# 
 # De una pequeña búsqueda cursada en google, surge que esas estaciones poseen los siguientes
-#atributos
+# atributos
 
 recovered_data <-  data.frame(nombre_de_estacion = c("Ecoparque", "Fitz Roy y Gorriti"),
            id_estacion = c(44, 159),
@@ -201,7 +201,7 @@ bicis_df[bicis_df$nombre_estacion_destino == "Fitz Roy y Gorriti",
            "long_estacion_destino",
            "domicilio_estacion_destino")] <- recovered_data %>% slice(2)
 
-# Si ahora volvemos a evaluar la estructura de los NA observamos lo siguiente
+ # Si ahora volvemos a evaluar la estructura de los NA observamos lo siguiente
 
 gg_miss_upset(bicis_df %>% select(-duracion_recorrido_minutos), nsets = n_var_miss(bicis_df))
 
@@ -275,7 +275,7 @@ ggplot(operaciones_dia_summ, aes(x = fct_rev(dia_semana))) +
 
 # A partir de la tabla y tal como se ha constatado en la visual, para un nivel de significancia del 5%
 # ünicamente podemos encontrar diferencias significativas en las medias al comparar el
-# grupo comprendido por los días lunes, martes, mércoles, jueves y viernes, con el comprendido por los 
+# grupo comprendido por los días lunes, martes, mércoles, jueves y viernes, con el comprendido por los
 # días sábado y domingo.
 # Es decir, existe superposición de los intevalos de confianza entre los días de semana entre sí, como así
 # también para los días de los fines de semana entre sí pero no al comparar días de semana con días del
@@ -322,9 +322,9 @@ ggplot(operaciones_dia_summ_sf, aes(x = fct_rev(dia_semana))) +
   ylab("Cantidad de Registros")+
   ggtitle("Intervalos de confianza de registros medios por día de semana (sin feriados)")
 
-#luego de comparar los resultados y hacer las visualizaciones, encontramos variaciones
+# luego de comparar los resultados y hacer las visualizaciones, encontramos variaciones
 # que denotan una mayor cantidad de operaciones para todos los días de la semana (excepto jueves
-# dado que no hubo feriados). En este sentido, las mayores diferencias absolutas se aprecian en los días 
+# dado que no hubo feriados). En este sentido, las mayores diferencias absolutas se aprecian en los días
 # lunes y martes. No obstante, dados los nuevos intervalos de confianza, no hay evidencia estadística de
 # que al remover los feriados haya diferencias en las medias vs contemplando los feriados con un nivel
 # de significatividad del 5%. Adicionalmente, se siguen presentando diferencias estadísticamente

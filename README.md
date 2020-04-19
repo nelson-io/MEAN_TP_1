@@ -1,10 +1,7 @@
 ---
-title: "Ecobicis"
-author: "Germán Martinez, Sol Rodríguez Giralt, Nelson Shilman & Ezequiel Vannoni"
-date: "2020-04-18"
-output:
-  html_document:
-    keep_md: true
+Título: "Ecobicis"
+Autores: "Germán Martinez, Sol Rodríguez Giralt, Nelson Shilman & Ezequiel Vannoni"
+Fecha: "2020-04-18"
 ---
 
 # Trabajo práctico n°1 - ECOBICIS -
@@ -166,7 +163,7 @@ ggplot(bicis_df %>% sample_n(2e4),
   geom_jitter(col= "blue", alpha = .05)+
   coord_cartesian(ylim=c(0,75))+
   theme_bw()+
-  ggtitle("Duracion de viaje por dia de la semana")+
+  ggtitle("Duración de viaje por dia de la semana")+
   xlab("Día")+
   ylab("Duración del recorrido (Minutos)")
 ```
@@ -473,9 +470,11 @@ ggplot(usuarios_plot, aes(x = rango_etario, y = total, fill = usuario_sexo))+
 ```
 
 ![](README_files/figure-html/unnamed-chunk-20-1.png)<!-- -->
-\n \n
+
+
+
 #### 2) Para dar un mejor servicio al usuario, se desea estudiar si (estadísticamente) existe estacionalidad en el uso de la EcoBicis. Una forma de probarlo (y comunicarlo) es construir un gráfico que reporte los intervalos de confianza de la cantidad media de usuarios por cada día de la semana. ¿Hay evidencia estadística de estacionalidad en el uso? Comente.
-\n \n
+
 
 Para resolver esta consigna, primero estimamos la cantidad total de usuarios por día de semana
 
@@ -524,10 +523,11 @@ días sábado y domingo.
 Es decir, existe superposición de los intevalos de confianza entre los días de semana entre sí, como así
 también para los días de los fines de semana entre sí pero no al comparar días de semana con días del
 fin de semana.
-\n \n
+
+
 #### 3) Es sabido que la media se puede ver afectada por la presencia de valores extremos (e.g. feriados). Sobre los datos anteriores se pide que descuente del análisis los días feriados de 2018 y vuelva a construir el gráfico. ¿Cambian los resultados? Comente.
 
-\n \n
+
 Dado que el dataset no ofrece información acerca de qué días han sido feriados, procedemos a conectarnos a una API de feriados y descargamos un vector con todos los feriados en Argentina del año 2018
 
 
@@ -583,10 +583,11 @@ lunes y martes. No obstante, dados los nuevos intervalos de confianza, no hay ev
 que al remover los feriados haya diferencias en las medias vs contemplando los feriados con un nivel
 de significatividad del 5%. Adicionalmente, se siguen presentando diferencias estadísticamente
 significativas entre los valores medios de los días de semana y los correspondientes a los fines de semana.
-\n \n
+
+
 #### 4) Concéntrese en el usuario 606320. en 2018 realizó 95 recorridos. Elimine los casos en que la estación de origen coincide con la de destino para el mismo recorrido. Queremos calcular la velocidad media a la que usualmente se desplaza este ciclista. Cuando trabajamos con velocidades lo correcto es utilizar la media armónica (y no la media aritmética). Calculando la distancia en bici entre las estaciones (use Google Maps) y con el dato de la duración del recorrido (asumiendo que la persona “no interrumpe el recorrido”, lo cual para este usuario resulta razonable), calcule la velocidad media de circulación de dicho usuario. Comente las ventajas de usar la media armónica en lugar de la media aritmética.
 
-\n \n
+
 Primero identificamos los registros del usuario 606320 con origen distinto a destino y
 omitimos los que tienen destino u origen NA
 
@@ -732,9 +733,10 @@ es menor el tiempo que se
 transcurre viajando. Consecuentemente, el estadístico suele sobreestimar la velocidad.
 En cambio, la media harmónica, al emplear recíprocos,permite anular este efecto,
 ya que implícitamente opera con el ratio de horas por km.
-\n \n
+
+
 #### 5) Una de las estaciones más concurridas es la “009-PARQUE LAS HERAS” y desde allí la mayoría de los usuarios suele dirigirse hasta la estación "066-BILLINGURST". Según Google Maps, entre una estación y otra hay 1.5km y en promedio en bici debería tardarse 8 minutos. Se considera que si un usuario tarda más de 15 minutos es porque hizo escalas en el camino u optó por otro recorrido antes de dejar la bici en su destino final. Evalúe empíricamente si la proporción de usuarios que tardan más de 15 minutos no supera el 20 %.
-\n \n
+
 
 Primero procedemos a filtrar nuestros datos 
 
@@ -777,9 +779,11 @@ binom.test(x = x, p = .2, alternative = "less")
 ```
 
 Al correr este test, encontramos que para un nivel de significancia del 5%, no disponemos de evidencia empírica sufucicente que nos permita rechazar la hipótesis nula de que los usuarios que demoran más de 15 minutos superan el 20% de los registros.
-\n \n
+
+
 #### 6) Sobre la prueba del punto anterior obtenga la curva de potencia del test. Comente.
-\n \n
+
+
 Construimos curva de potencia del test
 
 
@@ -793,9 +797,10 @@ plot(x, x_pwr, type = "l",lwd = 2)
 
 
 De esta podemos observar de acuerdo a la diferencia real en proporciones, cuál es la probabilidad de rechazo de la hipótesis nula dado que la hipótesis nula es falsa. Se observa de manera bastante más clara cómo a medida que nos separamos de 0,2 hacia la izquierda, aumenta la potencia del test.
-\n \n
+   
+   
 #### 7) En mayo de 2018 se inauguró la estación Facultad de Derecho de la línea H de subtes. ¿Afectó esto al uso de la EcoBici por la zona? Evalúe empíricamente si en la estación “001-FACULTAD DE DERECHO” se registró una diferencia estadísticamente significativa en el uso de las EcoBicis antes y después de la inauguración de la estación de subte. Comente.
-\n \n
+   
 
 Consultando wikipedia, encontramos que la inauguración de la estación "Facultad de Derecho" de la línea H, ha sido el 17 de mayo de 2018.
 
@@ -852,9 +857,11 @@ t.test(x = bicis_fd[bicis_fd$inaugurado ==1,"total"],
 ```
 
 Del test surge que la evidencia empírica nos permite rechazar con un nivel de significancia del 5%,  la hipótesis nula de que la cantidad media de recorridos para antes y después de la inauguración de la estación de subte es la misma.
-\n \n
+
+
 #### 8) Probar si existen diferencias estadísticamente significativas en el uso del sistema de EcoBici por género.
-\n \n
+
+
 Hacemos un test de medias para evaluar si existen diferencias estadísticamente significativas en el uso de Ecobicis por género
 
 
@@ -881,9 +888,10 @@ t.test(x = bicis_df[bicis_df$genero_usuario == "M","duracion_recorrido_minutos"]
 
 Del test surge que con un nivel de significancia del 5% rechazamos la hipótesis nula, indicando que la evidencia sugiere que la diferencia en las medias es mayor a cero.
 
-\n \n
+
 #### 9) Probar lo mismo que en el punto anterior, pero por grupo etario.
-\n \n
+
+
 Hacemos un left join de registros con usuarios para saber la edad de cada uno. \n
 primero hacemos un anti-join para saber si quedarían registros exceptuados
 
@@ -1023,10 +1031,10 @@ TukeyHSD(aov_rango_etario)
 ## (47,96]-(35,40]  1.902029681  1.66004940  2.14400996 0.0000000
 ## (47,96]-(40,47]  1.626480642  1.38227184  1.87068945 0.0000000
 ```
-\n \n
+
 
 #### 10) ¡Vamos por el 10! Bootstrapping: dado que la distribución del coeficiente de correlación no es normal ya que está limitada entre -1 y 1, el método bootstrap puede ser muy útil para hacer inferencia sobre dicho parámetro. Para ello, nos centraremos en la correlación entre la edad del usuario de EcoBici y la duración del recorrido para aquellos individuos que hacen el recorrido “Parque Las Heras - Billingurst” (mismos que en el punto 5 del TP). Siga los siguientes pasos para construir el intervalo de confianza del coeficiente de correlación entre dichas variables: 
-\n
+
 #### Defina una función ( function() ) que permita calcular el estadístico sobre el cual se quiere realizar el bootstrap. 
 
 #### Utilice la función boot() usando la base de datos de recorridos y la función generada en el paso anterior para tomar 1.000 muestras con reemplazo. 
@@ -1034,7 +1042,7 @@ TukeyHSD(aov_rango_etario)
 #### Obtenga el histograma de las estimaciones del bootstrap. Describa. 
 
 #### Utilice la función boot.ci() con la opción "perc" y obtenga el intervalo de confianza al 95 %. Interprete. ¿Resulta estadísticamente significativa la correlaciónentre la duración del recorrido y la edad del ciclista?
-\n \n
+
 
 Primero definimos subset de datos y la función de bootstrap
 

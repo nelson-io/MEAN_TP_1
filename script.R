@@ -429,7 +429,7 @@ harmonic_weighted_mean(x = df_606320$km_h, weights = df_606320$distancia/1e3 )
 
 # El problema de emplear la media aritmética, es que este estadístico
 # se calcula de manera aditiva y no contempla el hecho de que cuando vamos a una velocidad mayor,
-# es menor el tiempo que se 
+# es menor el tiempo que se
 # transcurre viajando. Consecuentemente, el estadístico suele sobreestimar la velocidad.
 # En cambio, la media harmónica, al emplear recíprocos,permite anular este efecto,
 # ya que implícitamente opera con el ratio de horas por km.
@@ -458,9 +458,9 @@ plot(x, x_pwr, type = "l",lwd = 2)
 # 7 Consultando wikipedia, encontramos que la inauguración de la estación "Facultad de Derecho"
 # de la línea H, ha sido inaugurada el 17 de mayo de 2018.
 
-#identificamos los registros en que el origen y/o destino haya sido la estación de ecobici
+# identificamos los registros en que el origen y/o destino haya sido la estación de ecobici
 # Facultad de Derecho, agrupamos las observaciones por día e identificamos las observaciones previas
-# con las anteriores 
+# con las anteriores
 
 
 bicis_fd <- bicis_df %>% 

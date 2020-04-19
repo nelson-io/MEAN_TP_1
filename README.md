@@ -8,9 +8,9 @@ output:
 ---
 
 # Trabajo práctico n°1 - ECOBICIS -
-
+\n \n
 #### 1) Descargue los datos de 2018 y a través de gráficos/tabulaciones describa brevemente\n las principales estadísticas relacionadas al uso de la EcoBici.
-
+\n \n
 
 Primero procedemos a activar los paquetes que vamos a emplear y descargamos los datos a usar
 a lo largo del trabajo práctico.
@@ -473,8 +473,9 @@ ggplot(usuarios_plot, aes(x = rango_etario, y = total, fill = usuario_sexo))+
 ```
 
 ![](README_files/figure-html/unnamed-chunk-20-1.png)<!-- -->
-
+\n \n
 #### 2) Para dar un mejor servicio al usuario, se desea estudiar si (estadísticamente) existe estacionalidad en el uso de la EcoBicis. Una forma de probarlo (y comunicarlo) es construir un gráfico que reporte los intervalos de confianza de la cantidad media de usuarios por cada día de la semana. ¿Hay evidencia estadística de estacionalidad en el uso? Comente.
+\n \n
 
 Para resolver esta consigna, primero estimamos la cantidad total de usuarios por día de semana
 
@@ -511,7 +512,7 @@ ggplot(operaciones_dia_summ, aes(x = fct_rev(dia_semana))) +
   ) +
   xlab("Día de la semana") +
   ylab("Cantidad de Registros")+
-  ggtitle("Intervalos de confianza de registros medios por día de semana")
+  ggtitle("Intervalos de confianza de registros por día de semana")
 ```
 
 ![](README_files/figure-html/unnamed-chunk-23-1.png)<!-- -->
@@ -523,10 +524,10 @@ días sábado y domingo.
 Es decir, existe superposición de los intevalos de confianza entre los días de semana entre sí, como así
 también para los días de los fines de semana entre sí pero no al comparar días de semana con días del
 fin de semana.
-
+\n \n
 #### 3) Es sabido que la media se puede ver afectada por la presencia de valores extremos (e.g. feriados). Sobre los datos anteriores se pide que descuente del análisis los días feriados de 2018 y vuelva a construir el gráfico. ¿Cambian los resultados? Comente.
 
-
+\n \n
 Dado que el dataset no ofrece información acerca de qué días han sido feriados, procedemos a conectarnos a una API de feriados y descargamos un vector con todos los feriados en Argentina del año 2018
 
 
@@ -569,7 +570,7 @@ ggplot(operaciones_dia_summ_sf, aes(x = fct_rev(dia_semana))) +
   ) +
   xlab("Día de la semana") +
   ylab("Cantidad de Registros")+
-  ggtitle("Intervalos de confianza de registros medios por día de semana (sin feriados)")
+  ggtitle("Intervalos de confianza de registros por día de semana (sin feriados)")
 ```
 
 ![](README_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
@@ -582,9 +583,517 @@ lunes y martes. No obstante, dados los nuevos intervalos de confianza, no hay ev
 que al remover los feriados haya diferencias en las medias vs contemplando los feriados con un nivel
 de significatividad del 5%. Adicionalmente, se siguen presentando diferencias estadísticamente
 significativas entre los valores medios de los días de semana y los correspondientes a los fines de semana.
-
+\n \n
 #### 4) Concéntrese en el usuario 606320. en 2018 realizó 95 recorridos. Elimine los casos en que la estación de origen coincide con la de destino para el mismo recorrido. Queremos calcular la velocidad media a la que usualmente se desplaza este ciclista. Cuando trabajamos con velocidades lo correcto es utilizar la media armónica (y no la media aritmética). Calculando la distancia en bici entre las estaciones (use Google Maps) y con el dato de la duración del recorrido (asumiendo que la persona “no interrumpe el recorrido”, lo cual para este usuario resulta razonable), calcule la velocidad media de circulación de dicho usuario. Comente las ventajas de usar la media armónica en lugar de la media aritmética.
 
+\n \n
+Primero identificamos los registros del usuario 606320 con origen distinto a destino y
+omitimos los que tienen destino u origen NA
 
 
+```r
+df_606320 <- bicis_df %>% 
+  filter(id_usuario == 606320,
+         nombre_estacion_origen != nombre_estacion_destino)
+```
+
+Con motivo de calcular la distancia entre las estaciones, nos conectamos a la API de Google Drive.
+
+Cada query a la API de Google requiere que nosotros informemos cuál es nuestra API key. Dado que no podemos
+compartir nuestra API key, agregamos una línea de código que permita a cualquier usuario seleccionar un documento de
+texto de manera local para hacer uso de su propia API key
+
+
+```r
+apiKEY <- read_lines(tcltk::tk_choose.files())
+```
+
+Dado que las consultas gratuitas son limitadas, con motivo de minimizar las consultas realizadas, conservamos las combinaciones únicas de origen destino
+
+
+```r
+df_606320_pairs <-  df_606320 %>%
+  select(
+    id_estacion_origen,
+    long_estacion_origen,
+    lat_estacion_origen,
+    id_estacion_destino,
+    long_estacion_destino,
+    lat_estacion_destino
+  ) %>% 
+  unique()
+```
+
+Para realizar las consultas a la APi, primero definimos en nuestro entorno global la estructura básica de la API
+
+
+```r
+url_base <- "https://maps.googleapis.com/maps/api/distancematrix/json?"
+```
+
+y luego generamos una función que dada la estructura de nuestros datos, permita consultar las coordenadas de origen y destino, obteniendo la distancia expresada en metros
+
+
+```r
+distance_extractor <- function(x){
+  url <- paste0(url_base, 
+                "origins=",
+                x$lat_estacion_origen,",", 
+                x$long_estacion_origen, "&destinations=",
+                x$lat_estacion_destino, ",",
+                x$long_estacion_destino,"&key=",
+                apiKEY)
+                
+  
+  
+  json <- fromJSON(txt = url)
+  
+  distance <- json$rows$elements[[1]]$distance$value
+   
+  return(distance)
+}
+```
+
+Inicializamos nuestro dataframe vacío
+
+
+```r
+df_distancias <- data.frame()
+```
+
+y hacemos un loop para consultar de manera iterativa todas las distancias únicas de nuestro interés
+
+
+```r
+for(i in 1:nrow(df_606320_pairs)){
+  
+  df <- df_606320_pairs %>% slice(i)
+  distancia <- distance_extractor(df)
+  
+  df_distancias <- rbind(df_distancias, cbind(df,distancia = distancia))
+  
+}
+```
+
+
+
+Ahora hacemos un left join para integrar las distancias a los registros originales del usuario
+
+
+```r
+df_606320 <- left_join(df_606320, df_distancias)
+```
+
+Luego, generamos una nueva variable *km_h* convirtiendo la distancia a kilómetros y la duración del recorrido a horas
+
+
+```r
+df_606320 <-  df_606320 %>% 
+  mutate(km_h = (distancia/1e3)/(duracion_recorrido_minutos/60))
+```
+
+y calculamos la media armónica de la velocidad del usuario
+
+
+```r
+harmonic_mean <- function(x){
+  (mean(x^(-1)))^(-1)
+}
+
+harmonic_mean(df_606320$km_h) 
+```
+
+```
+## [1] 9.017897
+```
+
+Observamos que la velocidad media es de 9 KM/H empleando la media harmónica.\n
+No obstante, no son equidistantes los recorridos por lo que resulta conveniente
+emplear una media harmónica ponderada por las distancias.
+
+
+```r
+harmonic_weighted_mean <- function(x, weights){
+  (sum((weights * x^(-1)))/sum(weights))^(-1)
+}
+
+harmonic_weighted_mean(x = df_606320$km_h, weights = df_606320$distancia/1e3 )
+```
+
+```
+## [1] 9.950994
+```
+
+Al usar la media Harmónica ponderada, la velocidad media es de 9.9093 km/h\n \n
+
+El problema de emplear la media aritmética, es que este estadístico
+se calcula de manera aditiva y no contempla el hecho de que cuando vamos a una velocidad mayor,
+es menor el tiempo que se
+transcurre viajando. Consecuentemente, el estadístico suele sobreestimar la velocidad.
+En cambio, la media harmónica, al emplear recíprocos,permite anular este efecto,
+ya que implícitamente opera con el ratio de horas por km.
+\n \n
+#### 5) Una de las estaciones más concurridas es la “009-PARQUE LAS HERAS” y desde allí la mayoría de los usuarios suele dirigirse hasta la estación "066-BILLINGURST". Según Google Maps, entre una estación y otra hay 1.5km y en promedio en bici debería tardarse 8 minutos. Se considera que si un usuario tarda más de 15 minutos es porque hizo escalas en el camino u optó por otro recorrido antes de dejar la bici en su destino final. Evalúe empíricamente si la proporción de usuarios que tardan más de 15 minutos no supera el 20 %.
+\n \n
+
+Primero procedemos a filtrar nuestros datos 
+
+
+```r
+bicis_9_66 <-  bicis_df %>% 
+  filter(id_estacion_origen == 9,
+         id_estacion_destino == 66,
+         !is.na(duracion_recorrido_minutos))
+```
+
+hacemos binom test para diferencias en proporciones. Para ello primero armamos un vector con los casos
+en que tenemos una duración mayor a 15 minutos y otro para los casos en que la duración es menor. Luego corremos el test
+
+
+```r
+x <-  vector(mode = "integer", length = 2L)
+x[1] <- sum(bicis_9_66$duracion_recorrido_minutos > 15)
+x[2] <- sum(!bicis_9_66$duracion_recorrido_minutos > 15)
+```
+
+
+
+```r
+binom.test(x = x, p = .2, alternative = "less")
+```
+
+```
+## 
+## 	Exact binomial test
+## 
+## data:  x
+## number of successes = 198, number of trials = 1073, p-value = 0.1088
+## alternative hypothesis: true probability of success is less than 0.2
+## 95 percent confidence interval:
+##  0.0000000 0.2051093
+## sample estimates:
+## probability of success 
+##              0.1845294
+```
+
+Al correr este test, encontramos que para un nivel de significancia del 5%, no disponemos de evidencia empírica sufucicente que nos permita rechazar la hipótesis nula de que los usuarios que demoran más de 15 minutos superan el 20% de los registros.
+\n \n
+#### 6) Sobre la prueba del punto anterior obtenga la curva de potencia del test. Comente.
+\n \n
+Construimos curva de potencia del test
+
+
+```r
+x <- seq(.05,.2,.001)
+x_pwr <- pwr.p.test(h = ES.h(x ,.2),n = 1073, alternative = "less" ,sig.level = .05)$power 
+plot(x, x_pwr, type = "l",lwd = 2)
+```
+
+![](README_files/figure-html/unnamed-chunk-41-1.png)<!-- -->
+
+
+De esta podemos observar de acuerdo a la diferencia real en proporciones, cuál es la probabilidad de rechazo de la hipótesis nula dado que la hipótesis nula es falsa. Se observa de manera bastante más clara cómo a medida que nos separamos de 0,2 hacia la izquierda, aumenta la potencia del test.
+\n \n
+#### 7) En mayo de 2018 se inauguró la estación Facultad de Derecho de la línea H de subtes. ¿Afectó esto al uso de la EcoBici por la zona? Evalúe empíricamente si en la estación “001-FACULTAD DE DERECHO” se registró una diferencia estadísticamente significativa en el uso de las EcoBicis antes y después de la inauguración de la estación de subte. Comente.
+\n \n
+
+Consultando wikipedia, encontramos que la inauguración de la estación "Facultad de Derecho" de la línea H, ha sido el 17 de mayo de 2018.
+
+identificamos los registros en que el origen y/o destino haya sido la estación de ecobici
+Facultad de Derecho, agrupamos las observaciones por día e identificamos las observaciones posteriores a la inauguración
+
+
+```r
+bicis_fd <- bicis_df %>% 
+  filter(id_estacion_origen == 1 | id_estacion_destino == 1) %>% 
+  group_by(fecha_origen_ymd) %>% 
+  summarise(total = n()) %>% 
+  mutate(inaugurado = ifelse(fecha_origen_ymd >= ymd("2018-05-17"),1,0))
+```
+
+Primero graficamos la serie identificando el momento en que se ha realizado la inauguración
+
+
+```r
+ggplot(bicis_fd)+
+  geom_line(aes(x=fecha_origen_ymd, y = total))+
+  geom_vline(xintercept = ymd("2018-05-17"), col = "red")+
+  theme_bw()+
+  annotate("text",ymd("2018-06-20"),300, 
+           label = "Inauguración Línea H \n Facultad de Derecho", size = 3, col= "red")+
+  ggtitle("Número de operaciones diarias involucrando estación Facultad de Derecho")+
+  xlab("Tiempo")+
+  ylab("Número de operaciones")
+```
+
+![](README_files/figure-html/unnamed-chunk-43-1.png)<!-- -->
+
+Ahora hacemos un test de diferencia de medias para observar si hay diferencias estadísticamente significativas en el uso del sistema para ese subset de datos con un nivel de significancia del 5%
+
+
+```r
+t.test(x = bicis_fd[bicis_fd$inaugurado ==1,"total"],
+       y = bicis_fd[bicis_fd$inaugurado ==0,"total"],
+       alternative = "two.sided")
+```
+
+```
+## 
+## 	Welch Two Sample t-test
+## 
+## data:  bicis_fd[bicis_fd$inaugurado == 1, "total"] and bicis_fd[bicis_fd$inaugurado == 0, "total"]
+## t = 9.2104, df = 355.78, p-value < 2.2e-16
+## alternative hypothesis: true difference in means is not equal to 0
+## 95 percent confidence interval:
+##  54.09842 83.47352
+## sample estimates:
+## mean of x mean of y 
+##  170.9119  102.1259
+```
+
+Del test surge que la evidencia empírica nos permite rechazar con un nivel de significancia del 5%,  la hipótesis nula de que la cantidad media de recorridos para antes y después de la inauguración de la estación de subte es la misma.
+\n \n
+#### 8) Probar si existen diferencias estadísticamente significativas en el uso del sistema de EcoBici por género.
+\n \n
+Hacemos un test de medias para evaluar si existen diferencias estadísticamente significativas en el uso de Ecobicis por género
+
+
+```r
+t.test(x = bicis_df[bicis_df$genero_usuario == "M","duracion_recorrido_minutos"],
+       y = bicis_df[bicis_df$genero_usuario == "F","duracion_recorrido_minutos"],
+       alternative = "two.sided",
+       conf.level = .95)
+```
+
+```
+## 
+## 	Welch Two Sample t-test
+## 
+## data:  bicis_df[bicis_df$genero_usuario == "M", "duracion_recorrido_minutos"] and bicis_df[bicis_df$genero_usuario == "F", "duracion_recorrido_minutos"]
+## t = -80.135, df = 1224267, p-value < 2.2e-16
+## alternative hypothesis: true difference in means is not equal to 0
+## 95 percent confidence interval:
+##  -2.704855 -2.575701
+## sample estimates:
+## mean of x mean of y 
+##  25.02425  27.66453
+```
+
+Del test surge que con un nivel de significancia del 5% rechazamos la hipótesis nula, indicando que la evidencia sugiere que la diferencia en las medias es mayor a cero.
+
+\n \n
+#### 9) Probar lo mismo que en el punto anterior, pero por grupo etario.
+\n \n
+Hacemos un left join de registros con usuarios para saber la edad de cada uno. \n
+primero hacemos un anti-join para saber si quedarían registros exceptuados
+
+
+
+```r
+anti_join(bicis_df, usuarios_df %>% select(usuario_id,usuario_edad) %>% unique(),
+          by = c("id_usuario" = "usuario_id")) %>% 
+  select(id_usuario) %>% 
+  unique() %>% 
+  pull() %>% 
+  length()
+```
+
+```
+## [1] 31105
+```
+
+De esta operación surge que por más que empleemos todos los usuarios registrados desde 2015, quedan 31105 usuarios que se encuentran en el dataset de operaciones y no se incluyen en el padrón de usuarios registrados.\n \n
+
+Ahora observamos si algun usuario aparece con más de una edad en la tabla de usuarios
+
+
+```r
+usuarios_df %>% 
+  select(usuario_id, usuario_edad) %>% 
+  unique() %>% 
+  group_by(usuario_id) %>% 
+  summarise(total = n()) %>% 
+  filter(total > 1)
+```
+
+```
+## # A tibble: 2 x 2
+##   usuario_id total
+##        <dbl> <int>
+## 1     363667     2
+## 2     368785     2
+```
+
+
+observamos que esto acontece con dos usuarios. Procedemos a quedarnos con la última observación asociada a cada registro
+
+
+```r
+usuarios_df <- usuarios_df %>% 
+  select(usuario_id, usuario_edad) %>% 
+  group_by(usuario_id) %>% 
+  summarise(usuario_edad = last(usuario_edad)) %>% 
+  ungroup()
+```
+
+Ahora realizamos el left join y omitimos registros sin edad o con una edad irracionalmente alta     
+
+
+```r
+bicis_df_joined <-  left_join(bicis_df, usuarios_df,by = c("id_usuario" = "usuario_id")) %>% 
+  filter(!is.na(usuario_edad),
+         !usuario_edad > 100)
+```
+
+
+Para definir el rango etario, vamos a  priorizar un output de grupos 
+aproximadamente balanceados por lo que emplearemos los deciles de edad para armar 10 grupos
+
+
+
+```r
+cuts <- c(as.integer(quantile(bicis_df_joined$usuario_edad, seq(0,1,.1))))
+bicis_df_joined$rango_etario <- cut(bicis_df_joined$usuario_edad, breaks = cuts)
+```
+
+Para identificar si hay diferencias significativas entre grupos, procedemos a realizar un análisis de varianza y mostramos con un test honesto de tuckey las diferencias entre grupos, idndicando aquellas que han sido estadísticamente significativas con un nivel de significancia del 5%.
+
+
+```r
+aov_rango_etario <- aov(duracion_recorrido_minutos ~ rango_etario , data = bicis_df_joined)
+```
+
+
+
+```r
+TukeyHSD(aov_rango_etario)
+```
+
+```
+##   Tukey multiple comparisons of means
+##     95% family-wise confidence level
+## 
+## Fit: aov(formula = duracion_recorrido_minutos ~ rango_etario, data = bicis_df_joined)
+## 
+## $rango_etario
+##                         diff         lwr         upr     p adj
+## (20,23]-(16,20] -0.466646245 -0.68554874 -0.24774375 0.0000000
+## (23,25]-(16,20] -0.377143893 -0.61486258 -0.13942520 0.0000229
+## (25,27]-(16,20] -0.369349859 -0.60286979 -0.13582993 0.0000247
+## (27,29]-(16,20] -0.373015553 -0.61517161 -0.13085950 0.0000481
+## (29,31]-(16,20] -0.907382340 -1.15957464 -0.65519004 0.0000000
+## (31,35]-(16,20] -0.962002337 -1.19393756 -0.73006712 0.0000000
+## (35,40]-(16,20] -0.496116502 -0.73674435 -0.25548865 0.0000000
+## (40,47]-(16,20] -0.220567463 -0.46343625  0.02230132 0.1130906
+## (47,96]-(16,20]  1.405913179  1.16731826  1.64450810 0.0000000
+## (23,25]-(20,23]  0.089502352 -0.12993701  0.30894172 0.9560582
+## (25,27]-(20,23]  0.097296386 -0.11758734  0.31218011 0.9172647
+## (27,29]-(20,23]  0.093630692 -0.13060806  0.31786944 0.9491058
+## (29,31]-(20,23] -0.440736095 -0.67577740 -0.20569479 0.0000001
+## (31,35]-(20,23] -0.495356092 -0.70851661 -0.28219557 0.0000000
+## (35,40]-(20,23] -0.029470257 -0.25205782  0.19311731 0.9999938
+## (40,47]-(20,23]  0.246078782  0.02107054  0.47108702 0.0192947
+## (47,96]-(20,23]  1.872559424  1.65217114  2.09294771 0.0000000
+## (25,27]-(23,25]  0.007794034 -0.22622923  0.24181730 1.0000000
+## (27,29]-(23,25]  0.004128340 -0.23851314  0.24676982 1.0000000
+## (29,31]-(23,25] -0.530238447 -0.78289689 -0.27758000 0.0000000
+## (31,35]-(23,25] -0.584858444 -0.81730043 -0.35241646 0.0000000
+## (35,40]-(23,25] -0.118972609 -0.36008896  0.12214374 0.8668493
+## (40,47]-(23,25]  0.156576430 -0.08677636  0.39992922 0.5736090
+## (47,96]-(23,25]  1.783057072  1.54396950  2.02214465 0.0000000
+## (27,29]-(25,27] -0.003665694 -0.24219508  0.23486370 1.0000000
+## (29,31]-(25,27] -0.538032481 -0.78674450 -0.28932046 0.0000000
+## (31,35]-(25,27] -0.592652478 -0.82079861 -0.36450634 0.0000000
+## (35,40]-(25,27] -0.126766643 -0.36374444  0.11021116 0.8001982
+## (40,47]-(25,27]  0.148782396 -0.09047053  0.38803532 0.6221833
+## (47,96]-(25,27]  1.775263038  1.54034976  2.01017632 0.0000000
+## (29,31]-(27,29] -0.534366787 -0.79120461 -0.27752896 0.0000000
+## (31,35]-(27,29] -0.588986784 -0.82596497 -0.35200860 0.0000000
+## (35,40]-(27,29] -0.123100949 -0.36859326  0.12239137 0.8551301
+## (40,47]-(27,29]  0.152448090 -0.09524115  0.40013733 0.6363998
+## (47,96]-(27,29]  1.778928732  1.53542873  2.02242873 0.0000000
+## (31,35]-(29,31] -0.054619997 -0.30184471  0.19260472 0.9995269
+## (35,40]-(29,31]  0.411265838  0.15586835  0.66666333 0.0000155
+## (40,47]-(29,31]  0.686814876  0.42930495  0.94432480 0.0000000
+## (47,96]-(29,31]  2.313295519  2.05981248  2.56677855 0.0000000
+## (35,40]-(31,35]  0.465885835  0.23046947  0.70130220 0.0000000
+## (40,47]-(31,35]  0.741434874  0.50372844  0.97914131 0.0000000
+## (47,96]-(31,35]  2.367915516  2.13457748  2.60125355 0.0000000
+## (40,47]-(35,40]  0.275549039  0.02935365  0.52174442 0.0145810
+## (47,96]-(35,40]  1.902029681  1.66004940  2.14400996 0.0000000
+## (47,96]-(40,47]  1.626480642  1.38227184  1.87068945 0.0000000
+```
+\n \n
+
+#### 10) ¡Vamos por el 10! Bootstrapping: dado que la distribución del coeficiente de correlación no es normal ya que está limitada entre -1 y 1, el método bootstrap puede ser muy útil para hacer inferencia sobre dicho parámetro. Para ello, nos centraremos en la correlación entre la edad del usuario de EcoBici y la duración del recorrido para aquellos individuos que hacen el recorrido “Parque Las Heras - Billingurst” (mismos que en el punto 5 del TP). Siga los siguientes pasos para construir el intervalo de confianza del coeficiente de correlación entre dichas variables: 
+\n
+#### Defina una función ( function() ) que permita calcular el estadístico sobre el cual se quiere realizar el bootstrap. 
+
+#### Utilice la función boot() usando la base de datos de recorridos y la función generada en el paso anterior para tomar 1.000 muestras con reemplazo. 
+
+#### Obtenga el histograma de las estimaciones del bootstrap. Describa. 
+
+#### Utilice la función boot.ci() con la opción "perc" y obtenga el intervalo de confianza al 95 %. Interprete. ¿Resulta estadísticamente significativa la correlaciónentre la duración del recorrido y la edad del ciclista?
+\n \n
+
+Primero definimos subset de datos y la función de bootstrap
+
+
+```r
+bicis_joined_9_66 <-  bicis_df_joined %>% 
+  filter(id_estacion_origen == 9,
+         id_estacion_destino == 66,
+         !is.na(duracion_recorrido_minutos))
+```
+
+
+```r
+cor_boot <- function(d,i){
+ data <- d[i,]
+return(cor(data$usuario_edad,data$duracion_recorrido_minutos))
+}
+```
+
+seteamos una semilla para asegurar reproducibilidad y hacemos el bootstrap
+
+```r
+set.seed(0)
+boot_out <- boot(data = bicis_joined_9_66,statistic = cor_boot,R = 1000)
+```
+
+Mostramos el histrograma:
+
+```r
+ggplot(boot_out$t %>% data.frame(replicates = .), aes(x = replicates))+
+  geom_histogram(aes(y =..density..), col = "white", binwidth = .008)+
+  geom_density(col = "blue", size = 1, fill = "blue", alpha = .2)+
+  theme_bw()+
+  ggtitle("Distribución de réplicas bootstrap\n Coef. de Correlación entre edad y minutos de uso")+
+  xlab("réplicas")+
+  ylab("densidad")
+```
+
+![](README_files/figure-html/unnamed-chunk-56-1.png)<!-- -->
+
+y calculamos el intervalo ed confianza para un nivel de confianza del 95%
+
+
+```r
+boot.ci(boot.out = boot_out, type = "perc",conf = .95) 
+```
+
+```
+## BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+## Based on 1000 bootstrap replicates
+## 
+## CALL : 
+## boot.ci(boot.out = boot_out, conf = 0.95, type = "perc")
+## 
+## Intervals : 
+## Level     Percentile     
+## 95%   ( 0.0451,  0.2345 )  
+## Calculations and Intervals on Original Scale
+```
+
+Encontramos que la evidencia sugiere la existencia de correlación positiva y estadísticamente significativa entre las variables. 
 

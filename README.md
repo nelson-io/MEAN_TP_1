@@ -5,7 +5,7 @@ Fecha: "2020-04-18"
 ---
 
 # Trabajo práctico n°1 - ECOBICIS -
-\n \n
+\\n 
 #### 1) Descargue los datos de 2018 y a través de gráficos/tabulaciones describa brevemente\n las principales estadísticas relacionadas al uso de la EcoBici.
 \n \n
 
